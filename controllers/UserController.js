@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const {encryptPassword, verifyPassword} = require('../helpers/PasswordHelper');
 const {createUserToken, getToken, verifyToken} = require('../helpers/TokenHelper');
+const {createUser, findUser, findUserById} = require('../repositories/UserRepository');
+
 require('dotenv').config();
 
 module.exports = class UserController {
@@ -19,7 +21,7 @@ module.exports = class UserController {
 
         // Check if user already exists
         try {
-            const userExists = await User.findOne({ email: email });
+            const userExists = await findUser(email);
             
             if(userExists) {
                 return res.status(422).json({ message: 'User already exists' });
@@ -37,7 +39,7 @@ module.exports = class UserController {
             });
 
             // Save user
-            const user = await newUser.save();
+            const user = await createUser(newUser);
 
             // Create token
             await createUserToken(user, req, res);
@@ -56,7 +58,7 @@ module.exports = class UserController {
 
        try {
              // Check if user exists
-            const user = await User.findOne({ email: email });
+            const user = await findUser(email);
             if(!user) {
                 return res.status(422).json({ message: `There is no user with this email. [${email}]` });
             }
@@ -83,7 +85,7 @@ module.exports = class UserController {
             const token = getToken(req);
             const decoded = verifyToken(token);
 
-            currentUser = await User.findOne({ _id: decoded.id }).select('-password');
+            currentUser = await findUserById(decoded.id);
         }
         else {
             currentUser = null;
@@ -100,7 +102,7 @@ module.exports = class UserController {
         }
     
         try {
-            const user = await User.findById(id).select('-password');
+            const user = await findUserById(id);
             if(!user) {
                 return res.status(422).json({ message: `There is no user with this id. [${id}]` });
             }
@@ -112,4 +114,23 @@ module.exports = class UserController {
 
     }
 
+    static async editUser(req, res) {
+        const  { id } = req.params;
+
+        if (!id) {
+            return res.status(422).json({ message: `Required fields are missing [id: ${id}]` });
+        }
+
+        try {
+            const user = await findUserById(id);
+            if(!user) {
+                return res.status(422).json({ message: `There is no user with this id. [${id}]` });
+            }
+
+        } catch (error) {
+            res.status(500).json({ message: `Internal server error [edit user] - ${error}` });
+        }
+
+        res.status(200).send({ message: `Edit user with id: ${id}` });
+    }
 }
